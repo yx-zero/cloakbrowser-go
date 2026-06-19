@@ -46,6 +46,34 @@ func main() {
 > A bare `cb.LaunchOptions{}` literal has Go zero values (`StealthArgs: false`), so prefer the
 > constructor and tweak fields, e.g. `opts := cb.NewLaunchOptions(); opts.Humanize = true`.
 
+## Launch variants
+
+```go
+// Returns a *Browser — call NewPage / NewContext on it.
+browser, _ := cb.Launch(ctx, cb.NewLaunchOptions())
+
+// Returns a *BrowserContext with viewport/UA/etc. pre-applied (closing it closes the browser).
+bctx, _ := cb.LaunchContext(ctx, cb.NewLaunchOptions(), cb.NewContextOptions())
+
+// Persistent profile — cookies/localStorage survive across runs in userDataDir.
+pctx, _ := cb.LaunchPersistentContext(ctx, "./my-profile", cb.NewLaunchOptions(), cb.NewContextOptions())
+```
+
+## Proxy & GeoIP
+
+```go
+opts := cb.NewLaunchOptions()
+opts.Proxy = "http://user:pass@host:8080"   // or "socks5://user:pass@host:1080"
+// Auto-detect timezone & locale (and spoof WebRTC IP) from the proxy's exit IP:
+opts.GeoIP = true
+browser, _ := cb.Launch(ctx, opts)
+```
+
+Credentials with special characters (`@`, `=`, …) are percent-encoded automatically. HTTP and
+SOCKS5 proxies are passed to Chromium via `--proxy-server` with inline auth (no CDP auth
+interceptor). With `GeoIP` enabled, a `~70 MB` GeoLite2-City database is downloaded on first use and
+cached in `~/.cloakbrowser/geoip/`. You can also pass `Timezone`/`Locale` explicitly to override.
+
 ## Features ported
 
 | Area | Source (Python) | Go |
