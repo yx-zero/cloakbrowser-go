@@ -1,0 +1,16 @@
+# Build artifacts
+*.exe
+*.png
+/cloakbrowser-cli
+
+# Upstream reference clone (not part of the Go port)
+/upstream/
+
+# Sensitive / local-only test scripts (not for publication)
+/examples/stealth_test/
+/cmd/_*/
+
+# Go
+/vendor/
+*.test
+*.out
