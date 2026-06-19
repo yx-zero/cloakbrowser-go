@@ -87,11 +87,15 @@ cached in `~/.cloakbrowser/geoip/`. You can also pass `Timezone`/`Locale` explic
 | **Native CDP client (replaces Playwright)** | *(Playwright)* | `cdp/` |
 | Browser / Context / Page / Mouse / Keyboard | *(Playwright)* | `browser.go`, `context.go`, `page.go`, `mouse.go`, `keyboard.go` |
 | Page interactions: Click, Fill, Type, Hover, DblClick, Tap, Check/Uncheck/SetChecked, SelectOption, Clear, DragTo, PressSequentially, Press | *(Playwright)* | `page.go`, `page_actions.go` |
-| DOM reads: IsChecked, IsVisible, GetAttribute, TextContent, InnerText, BoundingBox | *(Playwright)* | `page.go`, `page_actions.go` |
+| Actionability checks: attached/visible/enabled/editable/stable/pointer-events with `[100,250,500,1000]ms` backoff + `Force` | `human/actionability.py` | `actionability.go` |
+| Locator handle: `page.Locator(sel)`, `.Nth/.First`, Click/Fill/Type/Hover/Check/BoundingBox/TextContent/Count/... | `human/elementhandle.ts` | `locator.go` |
+| Storage state: save/load cookies + per-origin localStorage as JSON | *(Playwright `storage_state`)* | `storage.go` |
+| DOM reads: IsChecked, IsVisible, IsEnabled, IsEditable, GetAttribute, TextContent, InnerText, BoundingBox | *(Playwright)* | `page.go`, `page_actions.go` |
 | Navigation/waits: Goto, Reload, GoBack/Forward, WaitForSelector, WaitForFunction, WaitForLoadState (incl. networkidle) | *(Playwright)* | `page.go`, `page_nav.go` |
 | Headers, init scripts, response events: SetExtraHTTPHeaders, AddInitScript, OnResponse | *(Playwright)* | `page_nav.go` |
 | Humanize: Bézier mouse, typing+typos, smooth scroll, presets | `human/` | `human_*.go` |
 | CLI: install / info / update / clear-cache | `__main__.py` | `cmd/cloakbrowser` |
+| CDP multiplexer: per-seed Chrome behind one port | `bin/cloakserve` | `cmd/cloakserve` |
 
 ## CLI
 
@@ -101,6 +105,22 @@ go run ./cmd/cloakbrowser info         # version / platform / path / cache
 go run ./cmd/cloakbrowser update       # check for & download a newer binary
 go run ./cmd/cloakbrowser clear-cache  # remove cached binaries
 ```
+
+## CDP multiplexer (cloakserve)
+
+`cloakserve` runs one stealth Chromium **per fingerprint seed** behind a single CDP port — connect
+with `?fingerprint=<seed>` and each seed gets its own isolated browser identity.
+
+```bash
+go run ./cmd/cloakserve --port=9222 --idle-timeout=300
+# then point any CDP client at:
+#   http://host:9222/json/version?fingerprint=12345
+#   http://host:9222/json/version?fingerprint=12345&timezone=America/New_York&locale=en-US&proxy=socks5://...
+```
+
+Per-connection query params: `fingerprint`, `timezone`, `locale`, `proxy`, `geoip`, and any
+`--fingerprint-*` flag as `?name=value`. Idle seeds are reaped after `--idle-timeout` seconds
+(0 = never). `GET /` returns a JSON health/status snapshot of all live processes.
 
 ## Humanize
 
@@ -141,12 +161,8 @@ page.Goto(ctx, "https://your-protected-target/")
 
 ## Not ported (yet)
 
-- **Actionability checks** — the attached/visible/stable/enabled/editable/receives-pointer-events
-  retry loop (`[100,250,500,1000]ms` backoff) that upstream gates every humanized action behind.
-  Current methods do existence/visibility checks only.
-- **Locator/ElementHandle objects** — the API is selector-string based; there is no `page.Locator(sel)` handle yet.
-- `cloakserve` CDP multiplexer (per-seed Chrome behind one port).
-- Storage-state JSON export/import (`storage_state`); use a persistent `userDataDir` instead.
+- **iframe / multi-frame DOM** — selector queries and the isolated world target the main frame only.
+- **macOS Gatekeeper xattr removal** (`xattr -cr` after extract) — no-op on other platforms.
 - `patchright` backend — there is no Go equivalent; selecting it returns a clear error.
 - Playwright/Puppeteer API-shape shims — the Go API is idiomatic, not a JS clone.
 

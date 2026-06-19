@@ -16,6 +16,8 @@ import (
 type HoverOptions struct {
 	Timeout     time.Duration
 	HumanConfig map[string]any
+	// Force skips actionability checks.
+	Force bool
 }
 
 // humanCfgFor returns the effective humanize config for a per-call override map,
@@ -35,7 +37,7 @@ func (p *Page) humanCfgFor(overrides map[string]any) *resolvedHumanConfig {
 // Hover moves the pointer over the element matching selector (no click).
 func (p *Page) Hover(ctx context.Context, selector string, opts HoverOptions) error {
 	timeout := resolveTimeout(opts.Timeout)
-	if err := p.WaitForSelector(ctx, selector, timeout); err != nil {
+	if err := p.ensureActionable(ctx, selector, checksHover, timeout, opts.Force); err != nil {
 		return err
 	}
 	if cfg := p.humanCfgFor(opts.HumanConfig); cfg != nil {
@@ -57,6 +59,11 @@ func (p *Page) Hover(ctx context.Context, selector string, opts HoverOptions) er
 		}
 		isInput := p.isInputElement(ctx, selector)
 		target := clickTarget(box, isInput, cfg)
+		if !opts.Force {
+			if err := p.checkPointerEvents(ctx, selector, target.x, target.y, 5*time.Second); err != nil {
+				return err
+			}
+		}
 		humanMove(ctx, rm, ncx, ncy, target.x, target.y, cfg)
 		return nil
 	}
@@ -113,7 +120,7 @@ func (p *Page) IsChecked(ctx context.Context, selector string) (bool, error) {
 // Check ensures the element matching selector is checked (clicks only if needed).
 func (p *Page) Check(ctx context.Context, selector string, opts ClickOptions) error {
 	timeout := resolveTimeout(opts.Timeout)
-	if err := p.WaitForSelector(ctx, selector, timeout); err != nil {
+	if err := p.ensureActionable(ctx, selector, checksCheck, timeout, opts.Force); err != nil {
 		return err
 	}
 	p.maybeIdleBetween(ctx, opts.HumanConfig)
@@ -130,7 +137,7 @@ func (p *Page) Check(ctx context.Context, selector string, opts ClickOptions) er
 // Uncheck ensures the element matching selector is unchecked.
 func (p *Page) Uncheck(ctx context.Context, selector string, opts ClickOptions) error {
 	timeout := resolveTimeout(opts.Timeout)
-	if err := p.WaitForSelector(ctx, selector, timeout); err != nil {
+	if err := p.ensureActionable(ctx, selector, checksCheck, timeout, opts.Force); err != nil {
 		return err
 	}
 	p.maybeIdleBetween(ctx, opts.HumanConfig)

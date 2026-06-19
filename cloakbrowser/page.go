@@ -355,18 +355,24 @@ func (p *Page) ViewportSize(ctx context.Context) (Viewport, error) {
 type ClickOptions struct {
 	Timeout     time.Duration
 	HumanConfig map[string]any
+	// Force skips actionability checks (attached/visible/enabled/pointer-events).
+	Force bool
 }
 
 // FillOptions configures Fill.
 type FillOptions struct {
 	Timeout     time.Duration
 	HumanConfig map[string]any
+	// Force skips actionability checks.
+	Force bool
 }
 
 // TypeOptions configures Type.
 type TypeOptions struct {
 	Timeout     time.Duration
 	HumanConfig map[string]any
+	// Force skips actionability checks.
+	Force bool
 }
 
 // Click clicks the element matching selector.
@@ -377,14 +383,14 @@ func (p *Page) Click(ctx context.Context, selector string, opts ClickOptions) er
 	return p.plainClick(ctx, selector, opts)
 }
 
-// plainClick performs a non-humanized click: scroll into view, move, press,
-// release at the element center via raw CDP Input events.
+// plainClick performs a non-humanized click: actionability checks, scroll into
+// view, move, press, release at the element center via raw CDP Input events.
 func (p *Page) plainClick(ctx context.Context, selector string, opts ClickOptions) error {
 	timeout := opts.Timeout
 	if timeout <= 0 {
 		timeout = DefaultTimeout
 	}
-	if err := p.WaitForSelector(ctx, selector, timeout); err != nil {
+	if err := p.ensureActionable(ctx, selector, checksClick, timeout, opts.Force); err != nil {
 		return err
 	}
 	_ = p.scrollIntoView(ctx, selector)
@@ -397,6 +403,12 @@ func (p *Page) plainClick(ctx context.Context, selector string, opts ClickOption
 	}
 	cx := box.X + box.Width/2
 	cy := box.Y + box.Height/2
+	if !opts.Force {
+		t := 5 * time.Second
+		if err := p.checkPointerEvents(ctx, selector, cx, cy, t); err != nil {
+			return err
+		}
+	}
 	rm := p.RawMouse()
 	rm.Move(ctx, cx, cy)
 	rm.Down(ctx)

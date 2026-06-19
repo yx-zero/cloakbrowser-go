@@ -222,3 +222,83 @@ func TestKeyboardModifierTracking(t *testing.T) {
 		t.Errorf("after release Control = %d, want 8", rk.Modifiers())
 	}
 }
+
+func TestSafeSeed(t *testing.T) {
+	valid := []string{"12345", "abc-99", "seed_1", "A1b2C3"}
+	for _, s := range valid {
+		if !SafeSeed(s) {
+			t.Errorf("SafeSeed(%q) = false, want true", s)
+		}
+	}
+	invalid := []string{"", "__default__", "has space", "bad/slash", "a@b"}
+	for _, s := range invalid {
+		if SafeSeed(s) {
+			t.Errorf("SafeSeed(%q) = true, want false", s)
+		}
+	}
+	// 128 chars ok, 129 not.
+	long := make([]byte, 128)
+	for i := range long {
+		long[i] = 'a'
+	}
+	if !SafeSeed(string(long)) {
+		t.Error("128-char seed should be valid")
+	}
+	if SafeSeed(string(long) + "a") {
+		t.Error("129-char seed should be invalid")
+	}
+}
+
+func TestBuildSeedArgs(t *testing.T) {
+	args, tz, loc := BuildSeedArgs(SeedArgsOptions{
+		Seed:     "12345",
+		Timezone: "America/New_York",
+		Locale:   "en-US",
+		Headless: true,
+	})
+	if tz != "America/New_York" || loc != "en-US" {
+		t.Errorf("tz/loc = %q/%q", tz, loc)
+	}
+	got := map[string]string{}
+	for _, a := range args {
+		got[flagKey(a)] = a
+	}
+	if got["--fingerprint"] != "--fingerprint=12345" {
+		t.Errorf("fingerprint flag = %q", got["--fingerprint"])
+	}
+	if got["--fingerprint-timezone"] != "--fingerprint-timezone=America/New_York" {
+		t.Errorf("timezone flag = %q", got["--fingerprint-timezone"])
+	}
+	if got["--lang"] != "--lang=en-US" {
+		t.Errorf("lang flag = %q", got["--lang"])
+	}
+}
+
+func TestBuildSeedArgsWithSocksProxy(t *testing.T) {
+	args, _, _ := BuildSeedArgs(SeedArgsOptions{
+		Seed:     "1",
+		Proxy:    "socks5://user:p=ss@host:1080",
+		Headless: true,
+	})
+	var found string
+	for _, a := range args {
+		if flagKey(a) == "--proxy-server" {
+			found = a
+		}
+	}
+	if found != "--proxy-server=socks5://user:p%3Dss@host:1080" {
+		t.Errorf("proxy-server arg = %q (want encoded '=')", found)
+	}
+}
+
+func TestBoxesDiffer(t *testing.T) {
+	a := &BoundingBox{X: 10, Y: 10, Width: 100, Height: 20}
+	b := &BoundingBox{X: 10.5, Y: 10, Width: 100, Height: 20} // <1px diff
+	if boxesDiffer(a, b) {
+		t.Error("0.5px difference should not count as differing")
+	}
+	c := &BoundingBox{X: 13, Y: 10, Width: 100, Height: 20} // 3px diff
+	if !boxesDiffer(a, c) {
+		t.Error("3px difference should count as differing")
+	}
+}
