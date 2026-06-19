@@ -91,7 +91,8 @@ cached in `~/.cloakbrowser/geoip/`. You can also pass `Timezone`/`Locale` explic
 | Locator handle: `page.Locator(sel)`, `.Nth/.First`, Click/Fill/Type/Hover/Check/BoundingBox/TextContent/Count/... | `human/elementhandle.ts` | `locator.go` |
 | Storage state: save/load cookies + per-origin localStorage as JSON | *(Playwright `storage_state`)* | `storage.go` |
 | DOM reads: IsChecked, IsVisible, IsEnabled, IsEditable, GetAttribute, TextContent, InnerText, BoundingBox | *(Playwright)* | `page.go`, `page_actions.go` |
-| Navigation/waits: Goto, Reload, GoBack/Forward, WaitForSelector, WaitForFunction, WaitForLoadState (incl. networkidle) | *(Playwright)* | `page.go`, `page_nav.go` |
+| Navigation/waits: Goto, Reload, GoBack/Forward, WaitForSelector(+states), WaitForFunction, WaitForLoadState (incl. networkidle), WaitForURL, WaitForNavigation | *(Playwright)* | `page.go`, `page_nav.go` |
+| Frames/iframes: Frames, FrameLocator, FrameByURL/Name, per-frame Evaluate/BoundingBox/Click/Fill/WaitForSelector (offset-correct) | *(Playwright frames)* | `frame.go` |
 | Headers, init scripts, response events: SetExtraHTTPHeaders, AddInitScript, OnResponse | *(Playwright)* | `page_nav.go` |
 | Humanize: Bézier mouse, typing+typos, smooth scroll, presets | `human/` | `human_*.go` |
 | CLI: install / info / update / clear-cache | `__main__.py` | `cmd/cloakbrowser` |
@@ -161,7 +162,6 @@ page.Goto(ctx, "https://your-protected-target/")
 
 ## Not ported (yet)
 
-- **iframe / multi-frame DOM** — selector queries and the isolated world target the main frame only.
 - **macOS Gatekeeper xattr removal** (`xattr -cr` after extract) — no-op on other platforms.
 - `patchright` backend — there is no Go equivalent; selecting it returns a clear error.
 - Playwright/Puppeteer API-shape shims — the Go API is idiomatic, not a JS clone.

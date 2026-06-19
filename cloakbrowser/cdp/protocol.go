@@ -206,16 +206,26 @@ func (s *Session) Navigate(ctx context.Context, url string) error {
 	return nil
 }
 
-// FrameTree describes the page's frame hierarchy (subset).
-type FrameTree struct {
-	FrameTree struct {
-		Frame struct {
-			ID string `json:"id"`
-		} `json:"frame"`
-	} `json:"frameTree"`
+// FrameNode is one frame in the page's frame hierarchy.
+type FrameNode struct {
+	ID       string `json:"id"`
+	ParentID string `json:"parentId"`
+	URL      string `json:"url"`
+	Name     string `json:"name"`
 }
 
-// GetFrameTree returns the page's frame tree.
+// FrameTreeNode is a recursive frame tree entry.
+type FrameTreeNode struct {
+	Frame       FrameNode       `json:"frame"`
+	ChildFrames []FrameTreeNode `json:"childFrames"`
+}
+
+// FrameTree describes the page's frame hierarchy.
+type FrameTree struct {
+	FrameTree FrameTreeNode `json:"frameTree"`
+}
+
+// GetFrameTree returns the page's frame tree (recursive, with URLs and names).
 func (s *Session) GetFrameTree(ctx context.Context) (FrameTree, error) {
 	var out FrameTree
 	err := s.Send(ctx, "Page.getFrameTree", nil, &out)

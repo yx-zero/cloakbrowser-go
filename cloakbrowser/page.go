@@ -275,17 +275,72 @@ func jsonMarshal(v any) (string, error) {
 	return string(b), err
 }
 
-// WaitForSelector polls until an element matching selector exists (or timeout).
+// WaitState is the lifecycle state WaitForSelectorState waits for.
+type WaitState string
+
+const (
+	// WaitAttached waits until the element is present in the DOM.
+	WaitAttached WaitState = "attached"
+	// WaitVisible waits until the element is present and visible.
+	WaitVisible WaitState = "visible"
+	// WaitHidden waits until the element is absent or not visible.
+	WaitHidden WaitState = "hidden"
+	// WaitDetached waits until the element is removed from the DOM.
+	WaitDetached WaitState = "detached"
+)
+
+// WaitForSelector polls until an element matching selector exists (attached).
+// For other states use WaitForSelectorState.
 func (p *Page) WaitForSelector(ctx context.Context, selector string, timeout time.Duration) error {
+	return p.WaitForSelectorState(ctx, selector, WaitAttached, timeout)
+}
+
+// WaitForSelectorState polls until the element matching selector reaches the
+// given state (attached / visible / hidden / detached) or the timeout elapses.
+func (p *Page) WaitForSelectorState(ctx context.Context, selector string, state WaitState, timeout time.Duration) error {
 	if timeout <= 0 {
 		timeout = DefaultTimeout
 	}
+	if state == "" {
+		state = WaitAttached
+	}
 	deadline := time.Now().Add(timeout)
-	expr := "!!document.querySelector(" + jsonString(selector) + ")"
+
+	// One JS round-trip reports both presence and visibility.
+	expr := `(() => {
+		const el = document.querySelector(` + jsonString(selector) + `);
+		if (!el) return {present: false, visible: false};
+		const s = window.getComputedStyle(el);
+		const r = el.getBoundingClientRect();
+		const visible = s.visibility !== 'hidden' && s.display !== 'none' &&
+			parseFloat(s.opacity || '1') > 0 && r.width > 0 && r.height > 0;
+		return {present: true, visible};
+	})()`
+
 	for time.Now().Before(deadline) {
-		var found bool
-		if err := p.EvaluateIsolated(ctx, expr, &found); err == nil && found {
-			return nil
+		var st struct {
+			Present bool `json:"present"`
+			Visible bool `json:"visible"`
+		}
+		if err := p.EvaluateIsolated(ctx, expr, &st); err == nil {
+			switch state {
+			case WaitAttached:
+				if st.Present {
+					return nil
+				}
+			case WaitVisible:
+				if st.Present && st.Visible {
+					return nil
+				}
+			case WaitHidden:
+				if !st.Present || !st.Visible {
+					return nil
+				}
+			case WaitDetached:
+				if !st.Present {
+					return nil
+				}
+			}
 		}
 		select {
 		case <-ctx.Done():
@@ -293,7 +348,7 @@ func (p *Page) WaitForSelector(ctx context.Context, selector string, timeout tim
 		case <-time.After(50 * time.Millisecond):
 		}
 	}
-	return fmt.Errorf("timeout %s waiting for selector %q", timeout, selector)
+	return fmt.Errorf("timeout %s waiting for selector %q to be %s", timeout, selector, state)
 }
 
 // BoundingBox returns the bounding box of the first element matching selector,

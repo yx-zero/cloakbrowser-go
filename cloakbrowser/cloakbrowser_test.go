@@ -302,3 +302,40 @@ func TestBoxesDiffer(t *testing.T) {
 		t.Error("3px difference should count as differing")
 	}
 }
+
+func TestURLMatches(t *testing.T) {
+	cases := []struct {
+		url, pattern string
+		want         bool
+	}{
+		{"https://x.com/dashboard", "dashboard", true}, // substring
+		{"https://x.com/dashboard", "/login", false},   // substring miss
+		{"https://x.com/users/42", "https://x.com/users/*", true},
+		{"https://x.com/users/42/edit", "https://x.com/users/*", true},
+		{"https://x.com/posts/42", "https://x.com/users/*", false},
+		{"https://x.com/a/b/c", "*/b/*", true},
+		{"https://x.com/a/x/c", "*/b/*", false},
+		{"https://x.com/end", "*end", true},
+		{"https://x.com/end?q=1", "*end", false}, // anchored suffix
+		{"anything", "", true},                   // empty pattern matches all
+	}
+	for _, c := range cases {
+		if got := urlMatches(c.url, c.pattern); got != c.want {
+			t.Errorf("urlMatches(%q, %q) = %v, want %v", c.url, c.pattern, got, c.want)
+		}
+	}
+}
+
+func TestTrimURL(t *testing.T) {
+	cases := map[string]string{
+		"https://a.com/x":       "https://a.com/x",
+		"https://a.com/x?q=1":   "https://a.com/x",
+		"https://a.com/x#frag":  "https://a.com/x",
+		"https://a.com/x?q=1#f": "https://a.com/x",
+	}
+	for in, want := range cases {
+		if got := trimURL(in); got != want {
+			t.Errorf("trimURL(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
