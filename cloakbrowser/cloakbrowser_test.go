@@ -339,3 +339,89 @@ func TestTrimURL(t *testing.T) {
 		}
 	}
 }
+
+func TestContextViewportDefaults(t *testing.T) {
+	// Headless: neither Viewport nor NoViewport set => emulate DefaultViewport.
+	var headlessOpts ContextOptions
+	headlessOpts.applyDefaults(true)
+	if headlessOpts.NoViewport {
+		t.Error("headless default should emulate a viewport, not set NoViewport")
+	}
+	if headlessOpts.Viewport == nil || *headlessOpts.Viewport != DefaultViewport {
+		t.Errorf("headless default Viewport = %v, want %v", headlessOpts.Viewport, DefaultViewport)
+	}
+
+	// Headed: neither set => NoViewport (use real OS window, no impossible-window tell).
+	var headedOpts ContextOptions
+	headedOpts.applyDefaults(false)
+	if !headedOpts.NoViewport {
+		t.Error("headed default should set NoViewport to avoid the impossible-window tell")
+	}
+	if headedOpts.Viewport != nil {
+		t.Errorf("headed default should not emulate a viewport, got %v", headedOpts.Viewport)
+	}
+
+	// Explicit Viewport is honored even when headed.
+	custom := Viewport{Width: 800, Height: 600}
+	explicitVP := ContextOptions{Viewport: &custom}
+	explicitVP.applyDefaults(false)
+	if explicitVP.NoViewport || explicitVP.Viewport == nil || *explicitVP.Viewport != custom {
+		t.Errorf("explicit viewport not honored when headed: %+v", explicitVP)
+	}
+
+	// Explicit NoViewport is honored even when headless.
+	explicitNo := ContextOptions{NoViewport: true}
+	explicitNo.applyDefaults(true)
+	if !explicitNo.NoViewport || explicitNo.Viewport != nil {
+		t.Errorf("explicit NoViewport not honored when headless: %+v", explicitNo)
+	}
+}
+
+func TestEffectiveFingerprintPlatform(t *testing.T) {
+	cases := []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--fingerprint-platform=windows"}, "windows"},
+		{[]string{"--fingerprint-platform=macOS"}, "macos"}, // lowercased
+		{[]string{"--no-sandbox"}, ""},
+		{nil, ""},
+		// last one wins
+		{[]string{"--fingerprint-platform=linux", "--fingerprint-platform=windows"}, "windows"},
+	}
+	for _, c := range cases {
+		if got := effectiveFingerprintPlatform(c.args); got != c.want {
+			t.Errorf("effectiveFingerprintPlatform(%v) = %q, want %q", c.args, got, c.want)
+		}
+	}
+}
+
+func TestFontWarningSuppressed(t *testing.T) {
+	const env = "CLOAKBROWSER_SUPPRESS_FONT_WARNING"
+	cases := map[string]bool{
+		"":      false,
+		"0":     false,
+		"false": false,
+		"off":   false,
+		"no":    false,
+		"1":     true,
+		"true":  true,
+		"yes":   true,
+	}
+	for val, want := range cases {
+		t.Setenv(env, val)
+		if got := fontWarningSuppressed(); got != want {
+			t.Errorf("fontWarningSuppressed() with %s=%q = %v, want %v", env, val, got, want)
+		}
+	}
+}
+
+func TestFontFamilyPresent(t *testing.T) {
+	stems := map[string]bool{"segoeui": true, "arial": true}
+	if !fontFamilyPresent(fontFamily{"Segoe UI", []string{"segoeui"}}, stems) {
+		t.Error("Segoe UI should be detected present")
+	}
+	if fontFamilyPresent(fontFamily{"Calibri", []string{"calibri"}}, stems) {
+		t.Error("Calibri should be detected absent")
+	}
+}

@@ -15,27 +15,40 @@ import (
 type ContextOptions struct {
 	// UserAgent overrides the navigator.userAgent for pages in this context.
 	UserAgent string
-	// Viewport sets the emulated viewport. Use NoViewport to disable emulation.
+	// Viewport sets the emulated viewport. When nil, the default depends on
+	// headless mode (see applyDefaults). Set an explicit value to force
+	// emulation in any mode, or set NoViewport to disable it.
 	Viewport *Viewport
 	// NoViewport disables viewport emulation (use the OS window size).
 	NoViewport bool
 	// ColorScheme is "light", "dark" or "no-preference".
 	ColorScheme string
-
-	viewportSet bool
 }
 
-func (o *ContextOptions) applyDefaults() {
-	if !o.viewportSet && o.Viewport == nil && !o.NoViewport {
+// applyDefaults resolves the viewport policy for the given headless mode.
+//
+// An explicit Viewport or NoViewport is always honored. When neither is set,
+// headless mode emulates a realistic DefaultViewport, while headed mode uses
+// the real OS window (NoViewport) — applying setDeviceMetricsOverride to a
+// visible window creates an "impossible window" size mismatch that is a strong
+// bot-detection signal.
+func (o *ContextOptions) applyDefaults(headless bool) {
+	if o.NoViewport || o.Viewport != nil {
+		return
+	}
+	if headless {
 		v := DefaultViewport
 		o.Viewport = &v
+	} else {
+		o.NoViewport = true
 	}
 }
 
-// NewContextOptions returns ContextOptions with the default viewport applied.
+// NewContextOptions returns default ContextOptions. The viewport is resolved at
+// launch based on headless mode (emulated default when headless, real window
+// when headed); set Viewport or NoViewport explicitly to override.
 func NewContextOptions() ContextOptions {
-	v := DefaultViewport
-	return ContextOptions{Viewport: &v, viewportSet: true}
+	return ContextOptions{}
 }
 
 // BrowserContext is an isolated browsing context (cookies, storage, pages).

@@ -16,6 +16,7 @@ type Browser struct {
 	cmd         *exec.Cmd
 	userDataDir string
 	tempProfile bool
+	headless    bool
 
 	humanize bool
 	humanCfg *resolvedHumanConfig
@@ -30,7 +31,7 @@ func (b *Browser) Conn() *cdp.Conn { return b.conn }
 
 // NewContext creates a fresh, isolated browser context (incognito-like).
 func (b *Browser) NewContext(ctx context.Context, opts ContextOptions) (*BrowserContext, error) {
-	opts.applyDefaults()
+	opts.applyDefaults(b.headless)
 	var proxyServer, proxyBypass string
 	// Per-context proxy override is not derived from launch proxy here; the
 	// launch-level proxy already applies process-wide via --proxy-server.
@@ -52,7 +53,7 @@ func (b *Browser) NewContext(ctx context.Context, opts ContextOptions) (*Browser
 // defaultContext returns a BrowserContext bound to the browser's default
 // (non-incognito) context — used for persistent profiles.
 func (b *Browser) defaultContext(opts ContextOptions) *BrowserContext {
-	opts.applyDefaults()
+	opts.applyDefaults(b.headless)
 	bc := &BrowserContext{
 		browser:          b,
 		browserContextID: "", // empty => default context

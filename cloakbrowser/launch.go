@@ -177,6 +177,8 @@ func buildLaunchConfig(o LaunchOptions, userDataDir string) (*launchConfig, erro
 
 	chromeArgs := BuildArgs(o.StealthArgs, extra, timezone, locale, o.Headless, o.ExtensionPaths)
 
+	warnMissingWindowsFonts(chromeArgs)
+
 	cfg := &launchConfig{
 		binaryPath: binaryPath,
 		chromeArgs: chromeArgs,
@@ -248,6 +250,7 @@ func spawnChromium(ctx context.Context, cfg *launchConfig) (*Browser, error) {
 		cmd:         cmd,
 		userDataDir: cfg.userDataDir,
 		tempProfile: cfg.tempProfile,
+		headless:    cfg.headless,
 		humanize:    cfg.humanize,
 		humanCfg:    cfg.humanCfg,
 	}

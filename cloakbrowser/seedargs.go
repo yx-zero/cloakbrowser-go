@@ -50,6 +50,7 @@ func BuildSeedArgs(o SeedArgsOptions) (args []string, timezone, locale string) {
 	}
 
 	args = BuildArgs(true, fpExtra, timezone, locale, o.Headless, nil)
+	warnMissingWindowsFonts(args)
 	return args, timezone, locale
 }
 
